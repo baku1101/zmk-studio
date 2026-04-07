@@ -6,6 +6,7 @@ import {
 } from "@zmkfirmware/zmk-studio-ts-client/behaviors";
 import { BehaviorBinding } from "@zmkfirmware/zmk-studio-ts-client/keymap";
 import { BehaviorParametersPicker } from "./BehaviorParametersPicker";
+import { BehaviorHelp } from "./BehaviorHelp";
 import { validateValue } from "./parameters";
 
 export interface BehaviorBindingPickerProps {
@@ -48,10 +49,14 @@ export const BehaviorBindingPicker = ({
   const [behaviorId, setBehaviorId] = useState(binding.behaviorId);
   const [param1, setParam1] = useState<number | undefined>(binding.param1);
   const [param2, setParam2] = useState<number | undefined>(binding.param2);
+  const selectedBehavior = useMemo(
+    () => behaviors.find((b) => b.id == behaviorId),
+    [behaviorId, behaviors]
+  );
 
   const metadata = useMemo(
-    () => behaviors.find((b) => b.id == behaviorId)?.metadata,
-    [behaviorId, behaviors]
+    () => selectedBehavior?.metadata,
+    [selectedBehavior]
   );
 
   const sortedBehaviors = useMemo(
@@ -128,6 +133,15 @@ export const BehaviorBindingPicker = ({
           onParam2Changed={setParam2}
         />
       )}
+      <BehaviorHelp
+        behavior={selectedBehavior}
+        binding={{
+          behaviorId,
+          param1: param1 || 0,
+          param2: param2 || 0,
+        }}
+        layers={layers}
+      />
     </div>
   );
 };
