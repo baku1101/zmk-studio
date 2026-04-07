@@ -20,3 +20,5 @@ It is based on the upstream ZMK Studio project and includes local modifications 
   - `Delete` / `Backspace` to set the selected key to `Transparent`
   - `Ctrl/Cmd+Z`, `Ctrl+Y`, and `Ctrl/Cmd+Shift+Z` for undo/redo
 - Added arrow-key navigation for moving the selected key across the physical layout.
+
+For Japanese documentation, see [README_ja.md](./README_ja.md).
