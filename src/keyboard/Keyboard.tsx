@@ -34,6 +34,7 @@ import { deserializeLayoutZoom, LayoutZoom } from "./PhysicalLayout";
 import { useLocalStorageState } from "../misc/useLocalStorageState";
 
 type BehaviorMap = Record<number, GetBehaviorDetailsResponse>;
+type MoveDirection = "left" | "right" | "up" | "down";
 
 function normalizeBehaviorName(name: string | undefined) {
   return (name || "").trim().toLowerCase();
@@ -51,6 +52,98 @@ function isEditableTarget(target: EventTarget | null) {
     tagName === "textarea" ||
     tagName === "select"
   );
+}
+
+function getKeyCenter(layout: PhysicalLayout, index: number) {
+  const key = layout.keys[index];
+
+  return {
+    x: key.x + key.width / 2,
+    y: key.y + key.height / 2,
+  };
+}
+
+function scoreCandidate(
+  current: { x: number; y: number },
+  candidate: { x: number; y: number },
+  direction: MoveDirection
+) {
+  const dx = candidate.x - current.x;
+  const dy = candidate.y - current.y;
+  const horizontalBias = Math.abs(dx) * 1.2 + Math.abs(dy) * 2.4;
+  const verticalBias = Math.abs(dy) * 1.2 + Math.abs(dx) * 2.4;
+
+  switch (direction) {
+    case "left":
+      return dx < 0 ? horizontalBias : Number.POSITIVE_INFINITY;
+    case "right":
+      return dx > 0 ? horizontalBias : Number.POSITIVE_INFINITY;
+    case "up":
+      return dy < 0 ? verticalBias : Number.POSITIVE_INFINITY;
+    case "down":
+      return dy > 0 ? verticalBias : Number.POSITIVE_INFINITY;
+  }
+}
+
+function getInitialKeyPosition(
+  layout: PhysicalLayout,
+  keyCount: number,
+  direction: MoveDirection
+) {
+  let bestIndex = 0;
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  for (let index = 0; index < keyCount; index++) {
+    const center = getKeyCenter(layout, index);
+    const score =
+      direction === "left"
+        ? center.x * 10 + center.y
+        : direction === "right"
+          ? -center.x * 10 + center.y
+          : direction === "up"
+            ? center.y * 10 + center.x
+            : -center.y * 10 + center.x;
+
+    if (score < bestScore) {
+      bestScore = score;
+      bestIndex = index;
+    }
+  }
+
+  return bestIndex;
+}
+
+function getAdjacentKeyPosition(
+  layout: PhysicalLayout,
+  keyCount: number,
+  currentIndex: number | undefined,
+  direction: MoveDirection
+) {
+  if (keyCount === 0) {
+    return undefined;
+  }
+
+  if (currentIndex === undefined || currentIndex < 0 || currentIndex >= keyCount) {
+    return getInitialKeyPosition(layout, keyCount, direction);
+  }
+
+  const current = getKeyCenter(layout, currentIndex);
+  let bestIndex = currentIndex;
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  for (let index = 0; index < keyCount; index++) {
+    if (index === currentIndex) {
+      continue;
+    }
+
+    const score = scoreCandidate(current, getKeyCenter(layout, index), direction);
+    if (score < bestScore) {
+      bestScore = score;
+      bestIndex = index;
+    }
+  }
+
+  return Number.isFinite(bestScore) ? bestIndex : currentIndex;
 }
 
 function useBehaviors(): BehaviorMap {
@@ -328,6 +421,11 @@ export default function Keyboard() {
     [behaviors]
   );
 
+  const activeLayout = useMemo(
+    () => layouts?.[selectedPhysicalLayoutIndex],
+    [layouts, selectedPhysicalLayoutIndex]
+  );
+
   const moveLayer = useCallback(
     (start: number, end: number) => {
       const doMove = async (startIndex: number, destIndex: number) => {
@@ -585,6 +683,53 @@ export default function Keyboard() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [doUpdateBinding, selectedBinding, transparentBehavior]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isEditableTarget(event.target) || !activeLayout || !keymap?.layers[selectedLayerIndex]) {
+        return;
+      }
+
+      let direction: MoveDirection | undefined;
+      switch (event.key) {
+        case "ArrowLeft":
+          direction = "left";
+          break;
+        case "ArrowRight":
+          direction = "right";
+          break;
+        case "ArrowUp":
+          direction = "up";
+          break;
+        case "ArrowDown":
+          direction = "down";
+          break;
+        default:
+          return;
+      }
+
+      const keyCount = Math.min(
+        activeLayout.keys.length,
+        keymap.layers[selectedLayerIndex].bindings.length
+      );
+      const nextPosition = getAdjacentKeyPosition(
+        activeLayout,
+        keyCount,
+        selectedKeyPosition,
+        direction
+      );
+
+      if (nextPosition === undefined || nextPosition === selectedKeyPosition) {
+        return;
+      }
+
+      event.preventDefault();
+      setSelectedKeyPosition(nextPosition);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [activeLayout, keymap, selectedKeyPosition, selectedLayerIndex]);
 
   return (
     <div className="grid grid-cols-[auto_1fr] grid-rows-[1fr_minmax(10em,auto)] bg-base-300 max-w-full min-w-0 min-h-0">
