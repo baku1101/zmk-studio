@@ -124,7 +124,7 @@ export const AppHeader = ({
       </MenuTrigger>
       <div className="flex justify-end gap-1 px-2">
         {onUndo && (
-          <Tooltip label="Undo">
+          <Tooltip label="Undo (Ctrl/Cmd+Z)">
             <Button
               className="flex items-center justify-center p-1.5 rounded enabled:hover:bg-base-300 disabled:opacity-50"
               isDisabled={!canUndo}
@@ -136,7 +136,7 @@ export const AppHeader = ({
         )}
 
         {onRedo && (
-          <Tooltip label="Redo">
+          <Tooltip label="Redo (Ctrl+Y / Ctrl/Cmd+Shift+Z)">
             <Button
               className="flex items-center justify-center p-1.5 rounded enabled:hover:bg-base-300 disabled:opacity-50"
               isDisabled={!canRedo}

@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -33,6 +34,24 @@ import { deserializeLayoutZoom, LayoutZoom } from "./PhysicalLayout";
 import { useLocalStorageState } from "../misc/useLocalStorageState";
 
 type BehaviorMap = Record<number, GetBehaviorDetailsResponse>;
+
+function normalizeBehaviorName(name: string | undefined) {
+  return (name || "").trim().toLowerCase();
+}
+
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const tagName = target.tagName.toLowerCase();
+  return (
+    target.isContentEditable ||
+    tagName === "input" ||
+    tagName === "textarea" ||
+    tagName === "select"
+  );
+}
 
 function useBehaviors(): BehaviorMap {
   let connection = useContext(ConnectionContext);
@@ -183,6 +202,7 @@ export default function Keyboard() {
     number | undefined
   >(undefined);
   const behaviors = useBehaviors();
+  const bindingClipboardRef = useRef<BehaviorBinding | null>(null);
 
   const conn = useContext(ConnectionContext);
   const undoRedo = useContext(UndoRedoContext);
@@ -299,6 +319,14 @@ export default function Keyboard() {
 
     return keymap.layers[selectedLayerIndex].bindings[selectedKeyPosition];
   }, [keymap, selectedLayerIndex, selectedKeyPosition]);
+
+  const transparentBehavior = useMemo(
+    () =>
+      Object.values(behaviors).find(
+        (behavior) => normalizeBehaviorName(behavior.displayName) === "transparent"
+      ),
+    [behaviors]
+  );
 
   const moveLayer = useCallback(
     (start: number, end: number) => {
@@ -499,6 +527,64 @@ export default function Keyboard() {
       setSelectedLayerIndex(layers);
     }
   }, [keymap, selectedLayerIndex]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      const modifier = event.ctrlKey || event.metaKey;
+      const key = event.key.toLowerCase();
+
+      if (modifier && key === "c") {
+        if (!selectedBinding) {
+          return;
+        }
+
+        event.preventDefault();
+        bindingClipboardRef.current = { ...selectedBinding };
+        return;
+      }
+
+      if (modifier && key === "v") {
+        if (!bindingClipboardRef.current || !selectedBinding) {
+          return;
+        }
+
+        event.preventDefault();
+        void doUpdateBinding({ ...bindingClipboardRef.current });
+        return;
+      }
+
+      if (event.key !== "Delete" && event.key !== "Backspace") {
+        return;
+      }
+
+      if (!selectedBinding || !transparentBehavior) {
+        return;
+      }
+
+      const isAlreadyTransparent =
+        selectedBinding.behaviorId === transparentBehavior.id &&
+        selectedBinding.param1 === 0 &&
+        selectedBinding.param2 === 0;
+
+      if (isAlreadyTransparent) {
+        return;
+      }
+
+      event.preventDefault();
+      void doUpdateBinding({
+        behaviorId: transparentBehavior.id,
+        param1: 0,
+        param2: 0,
+      });
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [doUpdateBinding, selectedBinding, transparentBehavior]);
 
   return (
     <div className="grid grid-cols-[auto_1fr] grid-rows-[1fr_minmax(10em,auto)] bg-base-300 max-w-full min-w-0 min-h-0">
