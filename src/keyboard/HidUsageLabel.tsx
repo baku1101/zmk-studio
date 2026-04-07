@@ -1,32 +1,34 @@
-import {
-  hid_usage_get_labels,
-  hid_usage_page_and_id_from_usage,
-} from "../hid-usages";
+import { hid_usage_get_display_labels } from "../hid-usages";
 
 export interface HidUsageLabelProps {
   hid_usage: number;
+  preferShiftedSymbols?: boolean;
+  showModifiers?: boolean;
+  variant?: "short" | "med" | "long";
 }
 
-function remove_prefix(s?: string) {
-  return s?.replace(/^Keyboard /, "");
-}
-
-export const HidUsageLabel = ({ hid_usage }: HidUsageLabelProps) => {
-  let [page, id] = hid_usage_page_and_id_from_usage(hid_usage);
-
-  // TODO: Do something with implicit mods!
-  page &= 0xff;
-
-  let labels = hid_usage_get_labels(page, id);
+export const HidUsageLabel = ({
+  hid_usage,
+  preferShiftedSymbols = false,
+  showModifiers = false,
+  variant = "med",
+}: HidUsageLabelProps) => {
+  const labels = hid_usage_get_display_labels(hid_usage, { preferShiftedSymbols });
+  const label =
+    variant === "long"
+      ? labels.long || labels.med || labels.short
+      : variant === "med"
+        ? labels.med || labels.short
+        : labels.short;
 
   return (
-    <span
-      className="@[10em]:before:content-[attr(data-long-content)] @[6em]:before:content-[attr(data-med-content)] before:content-[attr(aria-label)]"
-      aria-label={remove_prefix(labels.short)}
-      data-med-content={remove_prefix(labels.med || labels.short)}
-      data-long-content={remove_prefix(
-        labels.long || labels.med || labels.short
+    <span className="inline-flex max-w-full flex-col items-center justify-center leading-none">
+      <span className="block max-w-full whitespace-nowrap">{label}</span>
+      {showModifiers && labels.modifierLabels.length > 0 && (
+        <span className="mt-0.5 text-[0.6em] opacity-70">
+          {labels.modifierLabels.join("+")}
+        </span>
       )}
-    />
+    </span>
   );
 };

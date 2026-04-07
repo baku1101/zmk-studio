@@ -14,8 +14,13 @@ import {
   Section,
 } from "react-aria-components";
 import {
+  all_implicit_mods,
   hid_usage_from_page_and_id,
+  hid_usage_get_implicit_mods,
+  hid_usage_mask_implicit_mods,
   hid_usage_page_get_ids,
+  implicit_mod_labels,
+  mods_to_flags,
 } from "../hid-usages";
 import { useCallback, useMemo } from "react";
 import { ChevronDown } from "lucide-react";
@@ -68,47 +73,6 @@ const UsageSection = ({ id, min, max }: UsageSectionProps) => {
   );
 };
 
-enum Mods {
-  LeftControl = 0x01,
-  LeftShift = 0x02,
-  LeftAlt = 0x04,
-  LeftGUI = 0x08,
-  RightControl = 0x10,
-  RightShift = 0x20,
-  RightAlt = 0x40,
-  RightGUI = 0x80,
-}
-
-const mod_labels: Record<Mods, string> = {
-  [Mods.LeftControl]: "L Ctrl",
-  [Mods.LeftShift]: "L Shift",
-  [Mods.LeftAlt]: "L Alt",
-  [Mods.LeftGUI]: "L GUI",
-  [Mods.RightControl]: "R Ctrl",
-  [Mods.RightShift]: "R Shift",
-  [Mods.RightAlt]: "R Alt",
-  [Mods.RightGUI]: "R GUI",
-};
-
-const all_mods = [
-  Mods.LeftControl,
-  Mods.LeftShift,
-  Mods.LeftAlt,
-  Mods.LeftGUI,
-  Mods.RightControl,
-  Mods.RightShift,
-  Mods.RightAlt,
-  Mods.RightGUI,
-];
-
-function mods_to_flags(mods: Mods[]): number {
-  return mods.reduce((a, v) => a + v, 0);
-}
-
-function mask_mods(value: number) {
-  return value & ~(mods_to_flags(all_mods) << 24);
-}
-
 export const HidUsagePicker = ({
   label,
   value,
@@ -116,9 +80,7 @@ export const HidUsagePicker = ({
   onValueChanged,
 }: HidUsagePickerProps) => {
   const mods = useMemo(() => {
-    let flags = value ? value >> 24 : 0;
-
-    return all_mods.filter((m) => m & flags).map((m) => m.toLocaleString());
+    return value ? hid_usage_get_implicit_mods(value).map((modifier) => modifier.toLocaleString()) : [];
   }, [value]);
 
   const selectionChanged = useCallback(
@@ -141,7 +103,7 @@ export const HidUsagePicker = ({
       }
 
       let mod_flags = mods_to_flags(m.map((m) => parseInt(m)));
-      let new_value = mask_mods(value) | (mod_flags << 24);
+      let new_value = hid_usage_mask_implicit_mods(value) | (mod_flags << 24);
       onValueChanged(new_value);
     },
     [value]
@@ -151,7 +113,7 @@ export const HidUsagePicker = ({
     <div className="flex gap-2 relative">
       {label && <Label id="hid-usage-picker">{label}:</Label>}
       <ComboBox
-        selectedKey={value ? mask_mods(value) : null}
+        selectedKey={value ? hid_usage_mask_implicit_mods(value) : null}
         onSelectionChange={selectionChanged}
         aria-labelledby="hid-usage-picker"
       >
@@ -177,13 +139,13 @@ export const HidUsagePicker = ({
         value={mods}
         onChange={modifiersChanged}
       >
-        {all_mods.map((m) => (
+        {all_implicit_mods.map((m) => (
           <Checkbox
             key={m}
             value={m.toLocaleString()}
             className="text-nowrap cursor-pointer grid px-2 content-center justify-center rac-selected:bg-primary border-base-100 bg-base-300 hover:bg-base-100 first:rounded-s-md last:rounded-e-md rac-selected:text-primary-content"
           >
-            {mod_labels[m]}
+            {implicit_mod_labels[m]}
           </Checkbox>
         ))}
       </CheckboxGroup>

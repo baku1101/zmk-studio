@@ -1,6 +1,7 @@
 import {
   CSSProperties,
   PropsWithChildren,
+  ReactNode,
   useLayoutEffect,
   useRef,
   useState,
@@ -10,6 +11,9 @@ import { Key } from "./Key";
 export type KeyPosition = PropsWithChildren<{
   id: string;
   header?: string;
+  primaryText?: string;
+  footer?: ReactNode;
+  title?: string;
   width: number;
   height: number;
   x: number;
